@@ -1,6 +1,6 @@
 # Shield Pharmacy
 
-Shield Pharmacy is a production-oriented pharmacy commerce platform for Kenya. The repository is organized as a deployable monorepo with a static web client, a modular Flask API, a MySQL data layer, and shared operational documentation.
+Shield Pharmacy is a production-oriented pharmacy commerce platform for Kenya. It uses a Next.js 16 App Router interface, Motion for React interactions, a Python 3.14 Flask JSON API, and a MySQL-compatible data layer.
 
 ## Delivery status
 
@@ -24,9 +24,8 @@ SHIELD/
 ├── backend/          Flask application and API modules
 ├── database/         Schema documentation, migrations, and seed strategy
 ├── documentation/    Architecture and engineering decisions
-├── frontend/         Tailwind/Alpine/GSAP/Swiper customer and admin clients
-├── static/           Shared public assets copied into deployable builds
-├── templates/        Shared HTML/email template source
+├── frontend/         Next.js customer, account, checkout and admin application
+├── static/uploads/   Backend-served catalogue uploads only
 ├── tests/            Cross-application and end-to-end tests
 └── uploads/          Local development uploads only
 ```
@@ -37,7 +36,7 @@ Read [documentation/architecture.md](documentation/architecture.md) before addin
 
 ## Local prerequisites
 
-- Python 3.12+
+- Python 3.14.6
 - Node.js 20+
 - MySQL 8+
 
@@ -56,6 +55,6 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Open `http://127.0.0.1:3000` for the Next.js storefront. Flask remains available at `http://127.0.0.1:5000` as the API and transitional admin surface. Local development uses SQLite automatically; production uses the MySQL `DATABASE_URL`. The seeded administrator is `admin@shield.test` with password `ShieldAdmin123!`; change or remove it before deployment.
+Open `http://127.0.0.1:3000` for every user-facing surface, including `/login`, `/account`, and `/admin`. Flask on `http://127.0.0.1:5000` is API-only; its former browser routes redirect to Next.js for compatibility. Local development uses SQLite automatically; production uses the MySQL `DATABASE_URL`.
 
-The complete authenticated Phase I surface (customer accounts, stored contact enquiries, and administration) is available on Flask at `http://127.0.0.1:5000`. See [documentation/admin-guide.md](documentation/admin-guide.md) for handover and training.
+The seeded local administrator is `admin@shield.test` with password `ShieldAdmin123!`. Replace it before deployment. See [documentation/admin-guide.md](documentation/admin-guide.md) for handover and training.

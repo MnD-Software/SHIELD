@@ -1,14 +1,12 @@
-# Deployment guide
+# Deployment
 
-## Render
+Shield is deployed as two coordinated services:
 
-Create a MySQL 8 database, set `DATABASE_URL`, and deploy the repository using `render.yaml`. Replace every generated or example secret. Set `SESSION_COOKIE_SECURE=true` in the production configuration before accepting customer traffic.
+- `frontend/`: Next.js 16 on Vercel or a Node.js 20+ host.
+- repository root: Python 3.14 Flask API on Render, container infrastructure, or another WSGI host.
 
-## Frontend topology
+Set `BACKEND_URL` for Next.js server-side API reads and `NEXT_PUBLIC_BACKEND_URL` only when a browser-visible backend origin is required. In the normal same-origin flow, browser requests use `/backend/*`, which Next.js rewrites to `BACKEND_URL` and preserves the authentication cookie.
 
-The current production build is server-rendered by Flask because authenticated forms, CSRF protection, and SEO routes share one deployable surface. A later independent Vercel frontend can consume `/api/v1` without changing domain services. Until that split, deploy the complete application to Render rather than publishing a disconnected static shell.
+Set `FRONTEND_URL` on Flask so compatibility routes return visitors to the Next.js application. Production also requires `DATABASE_URL`, a strong `SECRET_KEY`, secure cookies, allowed mail settings, and the M-Pesa variables documented in `.env.example`.
 
-## Release checks
-
-Run `pytest`, probe `/api/v1/health`, verify database backups, confirm HTTPS/security headers at the edge, and complete a sandbox M-Pesa callback test before enabling payment collection.
-
+Build the UI with `npm.cmd run build`; serve it with `npm.cmd start`. Run the API with Gunicorn using the command in `render.yaml` or the root `Dockerfile`.

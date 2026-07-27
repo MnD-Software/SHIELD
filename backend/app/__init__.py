@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, jsonify, redirect, request, session, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
@@ -372,11 +372,15 @@ def sync_jamieson_catalog():
 
 def create_app(test_config=None):
     root = Path(__file__).resolve().parents[2]
-    app = Flask(__name__, template_folder=str(root / "templates"), static_folder=str(root / "static"))
+    app = Flask(__name__, static_folder=str(root / "static"))
     app.config.update(SECRET_KEY=os.getenv("SECRET_KEY", "development-key-change-before-deploy"), SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", f"sqlite:///{root / 'shield.db'}"), SQLALCHEMY_TRACK_MODIFICATIONS=False, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE","false").lower()=="true", MAX_CONTENT_LENGTH=8 * 1024 * 1024)
     if test_config: app.config.update(test_config)
     db.init_app(app); login_manager.init_app(app); csrf.init_app(app)
     login_manager.login_view = "login"; login_manager.login_message_category = "info"
+    frontend_url=os.getenv("FRONTEND_URL","http://localhost:3000").rstrip("/")
+
+    def frontend_redirect(path="/"):
+        return redirect(f"{frontend_url}{path}")
 
     @app.after_request
     def security_headers(response):
@@ -387,15 +391,8 @@ def create_app(test_config=None):
         response.headers.setdefault("Content-Security-Policy", "default-src 'self'; img-src 'self' data: https://images.unsplash.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; frame-src https://www.google.com; connect-src 'self'")
         return response
 
-    @app.context_processor
-    def inject_globals():
-        wishlist_ids = set()
-        if current_user.is_authenticated:
-            wishlist_ids = {row.product_id for row in WishlistItem.query.filter_by(user_id=current_user.id).all()}
-        return {"cart_count": sum(session.get("cart", {}).values()), "year": datetime.utcnow().year, "categories_nav": Category.query.order_by(Category.name).all(), "wishlist_ids": wishlist_ids}
-
     @app.get("/")
-    def home(): return render_template("home.html", featured=Product.query.filter_by(featured=True).limit(4).all(), categories=Category.query.all(), popular=Product.query.order_by(Product.popularity.desc()).limit(4).all())
+    def home(): return frontend_redirect("/")
 
     @app.get("/products")
     def products():
@@ -408,7 +405,8 @@ def create_app(test_config=None):
         elif price=="1000-3000": query=query.filter(Product.price>=1000,Product.price<=3000)
         elif price=="over-3000": query=query.filter(Product.price>3000)
         query=query.order_by({"newest":Product.created_at.desc(),"price-low":Product.price.asc(),"price-high":Product.price.desc()}.get(sort,Product.popularity.desc()))
-        return render_template("products.html",products=query.all(),categories=Category.query.all(),brands=[r[0] for r in db.session.query(Product.brand).distinct().order_by(Product.brand)],selected={"q":q,"category":category,"brand":brand,"availability":availability,"sort":sort,"price":price},title="Shop all products")
+        suffix=f"?{request.query_string.decode()}" if request.query_string else ""
+        return frontend_redirect(f"/shop{suffix}")
 
     @app.get("/products/<slug>")
     def product_detail(slug):
@@ -416,7 +414,7 @@ def create_app(test_config=None):
         recent=session.get("recent",[]); recent=[product.id]+[item for item in recent if item!=product.id]; session["recent"]=recent[:6]
         recently_viewed=Product.query.filter(Product.id.in_(recent[1:])).limit(4).all() if len(recent)>1 else []
         reviews=Review.query.filter_by(product_id=product.id).order_by(Review.created_at.desc()).all()
-        return render_template("product.html",product=product,related=related,recently_viewed=recently_viewed,reviews=reviews)
+        return frontend_redirect(f"/product/{product.slug}")
 
     @app.post("/wishlist/toggle/<int:product_id>")
     @login_required
@@ -439,7 +437,7 @@ def create_app(test_config=None):
             for key in list(data):
                 qty=int(request.form.get(f"qty_{key}",data[key])); data.pop(key,None) if qty<=0 else data.update({key:qty})
             session["cart"]=data; flash("Basket updated.","success")
-        items,subtotal,delivery,discount=cart_details(); return render_template("cart.html",items=items,subtotal=subtotal,delivery=delivery,discount=discount,total=subtotal+delivery-discount)
+        return frontend_redirect("/cart")
 
     @app.post("/cart/remove/<int:product_id>")
     def remove_cart(product_id):
@@ -471,8 +469,8 @@ def create_app(test_config=None):
                     result = initiate_mpesa_stk(order); data = result.get("data", {})
                     attempt = PaymentAttempt(order=order, merchant_request_id=data.get("MerchantRequestID"), checkout_request_id=data.get("CheckoutRequestID"), status="Prompt sent" if result.get("ok") else "Pending", response_message=result["message"])
                     db.session.add(attempt); db.session.commit(); payment_notice = result["message"]
-                session.pop("cart",None); session.pop("discount",None); return render_template("order_success.html",order=order,payment_notice=payment_notice)
-        return render_template("checkout.html",items=items,subtotal=subtotal,delivery=delivery,discount=discount,total=subtotal+delivery-discount)
+                session.pop("cart",None); session.pop("discount",None); return frontend_redirect(f"/checkout?order={order.reference}")
+        return frontend_redirect("/checkout")
 
     @app.route("/login",methods=["GET","POST"])
     def login():
@@ -480,7 +478,7 @@ def create_app(test_config=None):
             user=User.query.filter(db.func.lower(User.email)==request.form.get("email","").strip().lower()).first()
             if user and check_password_hash(user.password_hash,request.form.get("password","")): login_user(user,remember=request.form.get("remember")=="on"); return redirect(url_for("admin" if user.role=="admin" else "account"))
             flash("Email or password is incorrect.","error")
-        return render_template("auth.html",mode="login")
+        return frontend_redirect("/login")
 
     @app.route("/register",methods=["GET","POST"])
     def register():
@@ -490,12 +488,12 @@ def create_app(test_config=None):
             elif len(password)<10: flash("Use at least 10 characters for your password.","error")
             else:
                 user=User(name=request.form.get("name","").strip(),email=email,phone=request.form.get("phone","").strip(),password_hash=generate_password_hash(password)); db.session.add(user); db.session.commit(); login_user(user); return redirect(url_for("account"))
-        return render_template("auth.html",mode="register")
+        return frontend_redirect("/register")
 
     @app.route("/forgot-password",methods=["GET","POST"])
     def forgot_password():
         if request.method=="POST": flash("If that email is registered, a secure reset link will be sent.","success")
-        return render_template("auth.html",mode="forgot")
+        return frontend_redirect("/login")
 
     @app.get("/logout")
     @login_required
@@ -508,7 +506,7 @@ def create_app(test_config=None):
             name=request.form.get("name","").strip(); phone=request.form.get("phone","").strip()
             if not name: flash("Your name is required.","error")
             else: current_user.name=name; current_user.phone=phone; db.session.commit(); flash("Profile updated.","success")
-        return render_template("account.html",orders=Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all(),saved=WishlistItem.query.filter_by(user_id=current_user.id).order_by(WishlistItem.created_at.desc()).all())
+        return frontend_redirect("/account")
 
     @app.get("/admin", defaults={"section":"overview"})
     @app.get("/admin/<section>")
@@ -538,15 +536,7 @@ def create_app(test_config=None):
             db.func.sum(OrderItem.quantity).label("quantity"),
             db.func.sum(OrderItem.unit_price*OrderItem.quantity).label("sales"),
         ).group_by(OrderItem.name).order_by(db.desc("quantity")).limit(6).all()
-        return render_template(
-            "admin.html",products=products,orders=orders,users=users,
-            categories=Category.query.order_by(Category.name).all(),messages=messages,
-            leads=leads,crm_activities=crm_activities,crm_tasks=crm_tasks,audit_events=audit_events,
-            coupons=Coupon.query.order_by(Coupon.code).all(),
-            payments=PaymentAttempt.query.order_by(PaymentAttempt.created_at.desc()).limit(10).all(),
-            revenue=revenue,sales_days=sales_days,max_daily=max_daily,
-            status_counts=status_counts,top_products=top_products,admin_section=section,
-        )
+        return frontend_redirect("/admin")
 
     @app.post("/admin/crm/leads")
     @login_required
@@ -689,6 +679,100 @@ def create_app(test_config=None):
         record_audit("care.message.resolved","ContactMessage",row.id,f"Resolved message from {row.name}")
         db.session.commit(); return redirect(url_for("admin"))
 
+    @app.post("/api/v1/auth/login")
+    @csrf.exempt
+    def api_login():
+        payload=request.get_json(silent=True) or {}
+        email=str(payload.get("email","")).strip().lower()
+        user=User.query.filter_by(email=email).first()
+        if not user or not check_password_hash(user.password_hash,str(payload.get("password",""))):
+            return jsonify({"error":"invalid_credentials","message":"The email or password is incorrect."}),401
+        login_user(user,remember=bool(payload.get("remember")))
+        return jsonify({"data":{"id":user.id,"name":user.name,"email":user.email,"phone":user.phone,"role":user.role}})
+
+    @app.post("/api/v1/auth/register")
+    @csrf.exempt
+    def api_register():
+        payload=request.get_json(silent=True) or {}
+        name=str(payload.get("name","")).strip()
+        email=str(payload.get("email","")).strip().lower()
+        password=str(payload.get("password",""))
+        if not name or "@" not in email or len(password)<8:
+            return jsonify({"error":"invalid_request","message":"Use a valid name, email and a password of at least 8 characters."}),400
+        if User.query.filter_by(email=email).first():
+            return jsonify({"error":"email_exists","message":"An account already exists for this email."}),409
+        user=User(name=name,email=email,phone=str(payload.get("phone","")).strip(),password_hash=generate_password_hash(password))
+        db.session.add(user); db.session.commit(); login_user(user)
+        return jsonify({"data":{"id":user.id,"name":user.name,"email":user.email,"phone":user.phone,"role":user.role}}),201
+
+    @app.post("/api/v1/auth/logout")
+    @csrf.exempt
+    def api_logout():
+        if current_user.is_authenticated:
+            logout_user()
+        return jsonify({"data":{"authenticated":False}})
+
+    @app.get("/api/v1/auth/me")
+    def api_me():
+        if not current_user.is_authenticated:
+            return jsonify({"data":None}),401
+        return jsonify({"data":{"id":current_user.id,"name":current_user.name,"email":current_user.email,"phone":current_user.phone,"role":current_user.role}})
+
+    @app.get("/api/v1/account")
+    def api_account():
+        if not current_user.is_authenticated:
+            return jsonify({"error":"authentication_required"}),401
+        orders=Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+        saved=WishlistItem.query.filter_by(user_id=current_user.id).order_by(WishlistItem.created_at.desc()).all()
+        return jsonify({"data":{
+            "user":{"id":current_user.id,"name":current_user.name,"email":current_user.email,"phone":current_user.phone,"role":current_user.role},
+            "orders":[{"id":o.id,"reference":o.reference,"status":o.status,"total":float(o.total),"created_at":o.created_at.isoformat()} for o in orders],
+            "wishlist":[serialize_product(row.product) for row in saved],
+        }})
+
+    @app.get("/api/v1/admin/overview")
+    def api_admin_overview():
+        require_admin()
+        orders=Order.query.order_by(Order.created_at.desc()).limit(50).all()
+        leads=CRMLead.query.order_by(CRMLead.updated_at.desc()).limit(50).all()
+        tasks=CRMTask.query.order_by(CRMTask.created_at.desc()).limit(50).all()
+        messages=ContactMessage.query.order_by(ContactMessage.created_at.desc()).limit(50).all()
+        audits=AuditEvent.query.order_by(AuditEvent.created_at.desc()).limit(30).all()
+        return jsonify({"data":{
+            "metrics":{"orders":Order.query.count(),"revenue":float(db.session.query(db.func.coalesce(db.func.sum(Order.total),0)).scalar()),"products":Product.query.count(),"low_stock":Product.query.filter(Product.stock<10).count(),"open_leads":CRMLead.query.filter(CRMLead.stage.notin_(["Converted","Lost"])).count(),"open_tasks":CRMTask.query.filter_by(status="Open").count()},
+            "orders":[{"id":o.id,"reference":o.reference,"customer_name":o.customer_name,"total":float(o.total),"status":o.status,"created_at":o.created_at.isoformat()} for o in orders],
+            "leads":[{"id":l.id,"name":l.name,"company":l.company,"email":l.email,"stage":l.stage,"owner":l.owner,"opportunity_value":float(l.opportunity_value),"updated_at":l.updated_at.isoformat()} for l in leads],
+            "tasks":[{"id":t.id,"lead_id":t.lead_id,"lead_name":t.lead.name,"title":t.title,"assigned_to":t.assigned_to,"priority":t.priority,"status":t.status,"due_at":t.due_at.isoformat() if t.due_at else None} for t in tasks],
+            "messages":[{"id":m.id,"name":m.name,"email":m.email,"subject":m.subject,"message":m.message,"status":m.status,"created_at":m.created_at.isoformat()} for m in messages],
+            "audit":[{"id":a.id,"action":a.action,"entity_type":a.entity_type,"summary":a.summary,"created_at":a.created_at.isoformat()} for a in audits],
+        }})
+
+    @app.patch("/api/v1/admin/orders/<int:order_id>")
+    @csrf.exempt
+    def api_admin_order_status(order_id):
+        require_admin()
+        order=db.get_or_404(Order,order_id); payload=request.get_json(silent=True) or {}; status=str(payload.get("status",""))
+        transitions={"Pending":{"Processing","Cancelled"},"Processing":{"Ready","Cancelled"},"Ready":{"Dispatched","Cancelled"},"Dispatched":{"Completed"},"Completed":set(),"Cancelled":set()}
+        if status not in transitions.get(order.status,set()):
+            return jsonify({"error":"invalid_transition","message":f"Order cannot move from {order.status} to {status}."}),409
+        previous=order.status; order.status=status
+        record_audit("order.status.changed","Order",order.id,f"{order.reference}: {previous} → {status}")
+        db.session.commit()
+        return jsonify({"data":{"id":order.id,"status":order.status}})
+
+    @app.patch("/api/v1/admin/crm/leads/<int:lead_id>")
+    @csrf.exempt
+    def api_admin_lead_stage(lead_id):
+        require_admin()
+        lead=db.get_or_404(CRMLead,lead_id); payload=request.get_json(silent=True) or {}; stage=str(payload.get("stage",""))
+        if stage not in {"New","Qualified","Opportunity","Converted","Lost"}:
+            return jsonify({"error":"invalid_stage"}),400
+        previous=lead.stage; lead.stage=stage
+        db.session.add(CRMActivity(lead=lead,activity_type="Stage changed",details=f"{previous} → {stage}",created_by=current_user.name))
+        record_audit("crm.stage.changed","CRMLead",lead.id,f"Moved {lead.name} from {previous} to {stage}")
+        db.session.commit()
+        return jsonify({"data":{"id":lead.id,"stage":lead.stage}})
+
     @app.get("/api/v1/products")
     def api_products():
         page=max(1,request.args.get("page",1,type=int)); per_page=min(100,max(1,request.args.get("per_page",24,type=int)))
@@ -740,7 +824,7 @@ def create_app(test_config=None):
             if not product or quantity>product.stock: return jsonify({"error":"stock_unavailable","message":"One or more products are unavailable."}),409
             subtotal+=product.effective_price*quantity; lines.append((product,quantity))
         delivery=Decimal("0") if subtotal>=3000 else Decimal("250")
-        order=Order(reference=f"SHP-{datetime.utcnow():%y%m%d}-{Order.query.count()+1:05d}",customer_name=customer["name"],email=customer["email"],phone=customer["phone"],address=customer["address"],town=customer["town"],county=customer["county"],payment_method=customer["payment_method"],subtotal=subtotal,delivery_fee=delivery,discount=0,total=subtotal+delivery)
+        order=Order(reference=f"SHP-{datetime.utcnow():%y%m%d}-{Order.query.count()+1:05d}",user_id=current_user.id if current_user.is_authenticated else None,customer_name=customer["name"],email=customer["email"],phone=customer["phone"],address=customer["address"],town=customer["town"],county=customer["county"],payment_method=customer["payment_method"],subtotal=subtotal,delivery_fee=delivery,discount=0,total=subtotal+delivery)
         db.session.add(order)
         for product,quantity in lines:
             product.stock-=quantity; db.session.add(OrderItem(order=order,product_id=product.id,name=product.name,sku=product.sku,quantity=quantity,unit_price=product.effective_price))
@@ -771,15 +855,13 @@ def create_app(test_config=None):
         return jsonify({"status":"ready" if ready else "configuration_required","checks":checks}),200 if ready else 503
 
     @app.get("/sitemap.xml")
-    def sitemap():
-        urls=[url_for("home",_external=True),url_for("products",_external=True),url_for("about",_external=True),url_for("contact",_external=True)]+[url_for("product_detail",slug=p.slug,_external=True) for p in Product.query.all()]
-        return app.response_class(render_template("sitemap.xml",urls=urls),mimetype="application/xml")
+    def sitemap(): return frontend_redirect("/sitemap.xml")
 
     @app.get("/robots.txt")
     def robots(): return app.response_class("User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: "+url_for("sitemap",_external=True),mimetype="text/plain")
 
     @app.get("/about")
-    def about(): return render_template("about.html",title="About Shield")
+    def about(): return frontend_redirect("/about")
     @app.route("/contact",methods=["GET","POST"])
     def contact():
         if request.method=="POST":
@@ -788,20 +870,20 @@ def create_app(test_config=None):
             fields={key:request.form.get(key,"").strip() for key in ("name","email","subject","message")}
             if not fields["name"] or "@" not in fields["email"] or not fields["message"]: flash("Please complete the contact form.","error")
             else: db.session.add(ContactMessage(**fields)); db.session.commit(); flash("Message received. Our care team will reply shortly.","success"); return redirect(url_for("contact"))
-        return render_template("contact.html",title="Contact us")
+        return frontend_redirect("/contact")
     @app.get("/categories")
-    def categories(): return render_template("categories.html",categories=Category.query.all(),title="Shop categories")
+    def categories(): return frontend_redirect("/categories")
     @app.get("/offers")
-    def offers(): return render_template("products.html",products=Product.query.filter(Product.sale_price.isnot(None)).all(),categories=Category.query.all(),brands=[],selected={"q":"","category":"","brand":"","availability":"","sort":"popular","price":""},title="Current offers")
+    def offers(): return frontend_redirect("/shop?offers=true")
     @app.get("/privacy")
-    def privacy(): return render_template("legal.html",page="privacy",title="Privacy policy")
+    def privacy(): return frontend_redirect("/privacy")
     @app.get("/terms")
-    def terms(): return render_template("legal.html",page="terms",title="Terms & conditions")
+    def terms(): return frontend_redirect("/terms")
 
     @app.errorhandler(404)
-    def not_found(error): return render_template("404.html"),404
+    def not_found(error): return jsonify({"error":"not_found"}),404
     @app.errorhandler(403)
-    def forbidden(error): return render_template("404.html",forbidden=True),403
+    def forbidden(error): return jsonify({"error":"forbidden"}),403
 
     with app.app_context():
         (Path(app.static_folder)/"uploads").mkdir(parents=True,exist_ok=True); db.create_all(); seed_database(); sync_jamieson_catalog()

@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { AdminDashboard } from "@/components/admin-dashboard";
+
+export const metadata: Metadata = { title: "Operations dashboard", robots: { index: false, follow: false } };
 
 export default function AdminPage() {
-  const backendUrl =
-    process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "") ??
-    "http://127.0.0.1:5000";
-
-  redirect(`${backendUrl}/admin`);
+  return <AdminDashboard />;
 }
