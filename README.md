@@ -58,3 +58,11 @@ npm.cmd run dev
 Open `http://127.0.0.1:3000` for every user-facing surface, including `/login`, `/account`, and `/admin`. Flask on `http://127.0.0.1:5000` is API-only; its former browser routes redirect to Next.js for compatibility. Local development uses SQLite automatically; production uses the MySQL `DATABASE_URL`.
 
 The seeded local administrator is `admin@shield.test` with password `ShieldAdmin123!`. Replace it before deployment. See [documentation/admin-guide.md](documentation/admin-guide.md) for handover and training.
+
+## Deploy
+
+1. In Render, create a Blueprint from this repository. `render.yaml` provisions the Docker API and PostgreSQL database. Enter the final Vercel URL for `FRONTEND_URL`.
+2. In Vercel, import this repository and set the Root Directory to `frontend`. Set `BACKEND_URL` to the Render service URL and `NEXT_PUBLIC_SITE_URL` to the Vercel production URL.
+3. Redeploy Vercel after both variables are saved, then update Render's `FRONTEND_URL` if the assigned Vercel domain changed.
+
+Do not set `NEXT_PUBLIC_BACKEND_URL`; browser requests intentionally use the same-origin `/backend` proxy. Full details are in [documentation/deployment.md](documentation/deployment.md).

@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -373,6 +374,7 @@ def sync_jamieson_catalog():
 def create_app(test_config=None):
     root = Path(__file__).resolve().parents[2]
     app = Flask(__name__, static_folder=str(root / "static"))
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.config.update(SECRET_KEY=os.getenv("SECRET_KEY", "development-key-change-before-deploy"), SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", f"sqlite:///{root / 'shield.db'}"), SQLALCHEMY_TRACK_MODIFICATIONS=False, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE","false").lower()=="true", MAX_CONTENT_LENGTH=8 * 1024 * 1024)
     if test_config: app.config.update(test_config)
     db.init_app(app); login_manager.init_app(app); csrf.init_app(app)
@@ -907,7 +909,8 @@ def product_variation_meta(product):
 
 
 def serialize_product(product, detailed=False):
-    data={"id":product.id,"name":product.name,"slug":product.slug,"brand":product.brand,"sku":product.sku,"category":{"name":product.category.name,"slug":product.category.slug},"price":float(product.price),"sale_price":float(product.sale_price) if product.sale_price is not None else None,"effective_price":float(product.effective_price),"stock":product.stock,"image":product.image,"featured":product.featured,"popularity":product.popularity,"description":product.description}
+    image=f"{request.url_root.rstrip('/')}{product.image}" if product.image.startswith("/") else product.image
+    data={"id":product.id,"name":product.name,"slug":product.slug,"brand":product.brand,"sku":product.sku,"category":{"name":product.category.name,"slug":product.category.slug},"price":float(product.price),"sale_price":float(product.sale_price) if product.sale_price is not None else None,"effective_price":float(product.effective_price),"stock":product.stock,"image":image,"featured":product.featured,"popularity":product.popularity,"description":product.description}
     group, label = product_variation_meta(product)
     data.update(variation_group=group, variation_label=label)
     if detailed: data.update(benefits=product.benefits,usage=product.usage,ingredients=product.ingredients,warnings=product.warnings)

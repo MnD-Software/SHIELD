@@ -1,15 +1,35 @@
 services:
   - type: web
     name: shield-pharmacy-api
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 run:app
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.4
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
+        fromDatabase:
+          name: shield-pharmacy-db
+          property: connectionString
+      - key: FRONTEND_URL
+        sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: MPESA_ENABLED
+        value: "false"
+      - key: MAIL_SERVER
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
         sync: false
 
+databases:
+  - name: shield-pharmacy-db
+    plan: free
+    databaseName: shield_pharmacy
+    user: shield_user
