@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}Shield Pharmacy — Admin{% endblock %}
+{% block content %}
+<div class="admin-shell admin-view-{{ admin_section }}">
+  <aside class="admin-sidebar">
+    <a class="admin-logo" href="/admin"><img src="{{ url_for('static',filename='images/shield-logo.svg') }}" alt=""><b>SHIELD<small>PHARMACY</small></b></a>
+    <nav>
+      <p>Workspace</p>
+      <a class="{{ 'active' if admin_section=='overview' }}" href="/admin"><i>⌂</i>Dashboard</a>
+      <p>Commerce</p>
+      <a class="{{ 'active' if admin_section=='orders' }}" href="/admin/orders"><i>▤</i>Orders <b>{{ orders|length }}</b></a>
+      <a class="{{ 'active' if admin_section=='catalogue' }}" href="/admin/catalogue"><i>◇</i>Catalogue <b>{{ products|length }}</b></a>
+      <a class="{{ 'active' if admin_section=='stock' }}" href="/admin/stock"><i>▦</i>Stock & batches <b class="warn">{{ products|selectattr('stock','lt',10)|list|length }}</b></a>
+      <a class="{{ 'active' if admin_section=='purchasing' }}" href="/admin/purchasing"><i>⇣</i>Purchasing</a>
+      <a href="#coupons"><i>%</i>Coupons</a>
+      <p>Pharmacy care</p>
+      <a class="{{ 'active' if admin_section=='prescriptions' }}" href="/admin/prescriptions"><i>Rx</i>Prescriptions</a>
+      <a class="{{ 'active' if admin_section=='customers' }}" href="/admin/customers"><i>♙</i>Customers</a>
+      <a class="{{ 'active' if admin_section=='crm' }}" href="/admin/crm"><i>◎</i>CRM</a>
+      <a class="{{ 'active' if admin_section=='marketing' }}" href="/admin/marketing"><i>⌁</i>Marketing</a>
+      <p>Operations</p>
+      <a class="{{ 'active' if admin_section=='payments' }}" href="/admin/payments"><i>◫</i>Payments</a>
+      <a class="{{ 'active' if admin_section=='settings' }}" href="/admin/settings"><i>⚙</i>Settings</a>
+      <a class="{{ 'active' if admin_section=='audit' }}" href="/admin/audit"><i>✓</i>Audit log</a>
+    </nav>
+    <a class="admin-store-link" href="http://127.0.0.1:3000">↗ View storefront</a>
+  </aside>
+
+  <div class="admin-workspace">
+    <header class="admin-topbar">
+      <button class="admin-menu-toggle" type="button" aria-label="Toggle navigation">☰</button>
+      <div><b>Shield Pharmacy</b><span>Operations centre</span></div>
+      <label class="admin-search">⌕ <input placeholder="Search orders, products, customers"></label>
+      <div class="admin-user"><span>{{ current_user.name[:1] }}</span><b>{{ current_user.name }}<small>Administrator</small></b></div>
+      <a class="wp-help" href="#settings">Screen Options</a><a class="wp-help" href="#messages">Help</a>
+    </header>
+
+    <main class="admin-content">
+      {% set page_titles={'overview':'Dashboard','orders':'Orders','catalogue':'Products & catalogue','stock':'Stock, batches & expiry','purchasing':'Purchasing & suppliers','prescriptions':'Prescription reviews','customers':'Customers','crm':'CRM','marketing':'Marketing','payments':'Payments','settings':'Pharmacy settings','audit':'Security & audit log'} %}
+      <section id="overview" class="admin-title">
+        <div><span class="eyebrow">Shield Pharmacy</span><h1>{{ page_titles[admin_section] }}</h1><p>Manage {{ page_titles[admin_section]|lower }}.</p></div>
+        <div><span class="admin-live"><i></i> Store online</span><button class="admin-primary" type="button" data-admin-open>+ Add product</button></div>
+      </section>
+      <div class="wp-notices">
+        <article><b>Shield Pharmacy operations are online.</b><span>Catalogue, checkout and M-Pesa monitoring are available.</span><button>×</button></article>
+        {% set low_count=products|selectattr('stock','lt',10)|list|length %}{% if low_count %}<article class="warning"><b>Inventory attention required.</b><span>{{ low_count }} products are below the reorder threshold.</span><a href="#inventory">Review stock</a></article>{% endif %}
+      </div>
+      <section id="future-command" class="future-command">
+        <header><div><span>SHIELD OS · LIVE</span><h2>Pharmacy command centre</h2><p>One launchpad for care, commerce and operations.</p></div><div class="system-pulse"><i></i> All systems operational</div></header>
+        <div class="module-launchpad">
+          <a href="/admin/prescriptions"><i>Rx</i><span><b>Clinical queue</b><small>Prescription validation</small></span><em>{{ messages|rejectattr('status','equalto','Resolved')|list|length }}</em></a>
+          <a href="/admin/orders"><i>◎</i><span><b>Order control</b><small>Fulfilment pipeline</small></span><em>{{ orders|length }}</em></a>
+          <a href="/admin/stock"><i>◫</i><span><b>Smart inventory</b><small>Batches, expiry and FEFO</small></span><em>{{ products|selectattr('stock','lt',10)|list|length }}</em></a>
+          <a href="/admin/purchasing"><i>⇣</i><span><b>Procurement</b><small>Suppliers and purchasing</small></span><em>→</em></a>
+          <a href="/admin/crm"><i>◉</i><span><b>Customer 360</b><small>CRM and care timeline</small></span><em>{{ users|length }}</em></a>
+          <a href="/admin/marketing"><i>⌁</i><span><b>Growth studio</b><small>Campaigns and journeys</small></span><em>→</em></a>
+          <a href="/admin/payments"><i>◈</i><span><b>Finance pulse</b><small>M-Pesa and revenue</small></span><em>→</em></a>
+          <a href="/admin/settings"><i>AI</i><span><b>Intelligence layer</b><small>Forecasts and anomaly alerts</small></span><em class="beta">BETA</em></a>
+        </div>
+        <div class="ai-insights">
+          <article><span>AI STOCK SIGNAL</span><b>{{ products|selectattr('stock','lt',10)|list|length }} products may need replenishment</b><small>Calculated from the configured reorder threshold.</small></article>
+          <article><span>CARE DESK SIGNAL</span><b>{{ messages|rejectattr('status','equalto','Resolved')|list|length }} conversations need attention</b><small>Prioritize unresolved pharmacy enquiries.</small></article>
+          <article><span>REVENUE SIGNAL</span><b>KSh {{ '{:,.0f}'.format(revenue) }} processed</b><small>Live total from placed orders.</small></article>
+        </div>
+      </section>
+
+      <section class="admin-kpis">
+        <article><span>Gross revenue</span><b>KSh {{ '{:,.0f}'.format(revenue) }}</b><small>Across all placed orders</small><i>↗</i></article>
+        <article><span>Total orders</span><b>{{ orders|length }}</b><small>{{ status_counts.Pending }} awaiting review</small><i>▤</i></article>
+        <article><span>Products sold</span><b>{{ top_products|sum(attribute='quantity') if top_products else 0 }}</b><small>Units fulfilled</small><i>◇</i></article>
+        <article><span>Low stock</span><b>{{ products|selectattr('stock','lt',10)|list|length }}</b><small>Products need attention</small><i>!</i></article>
+      </section>
+
+      <section id="analytics" class="admin-dashboard-grid">
+        <article class="admin-widget sales-widget">
+          <header><div><span>Revenue</span><h2>Sales performance</h2></div><select><option>Last 7 days</option></select></header>
+          <div class="admin-bars">
+            {% for day in sales_days %}
+            <div><span style="height:{{ 8 + (day.total/max_daily*82) }}%"></span><b>KSh {{ '{:,.0f}'.format(day.total) }}</b><small>{{ day.label }}</small></div>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="admin-widget">
+          <header><div><span>Workflow</span><h2>Order pipeline</h2></div><a href="#orders">View orders →</a></header>
+          <div class="pipeline-list">
+            {% for status,color in [('Pending','amber'),('Processing','blue'),('Ready','purple'),('Dispatched','green'),('Completed','dark')] %}
+            <div><i class="{{ color }}"></i><span>{{ status }}</span><b>{{ status_counts[status] }}</b></div>
+            {% endfor %}
+          </div>
+        </article>
+      </section>
+
+      <section id="overview-insights" class="admin-dashboard-grid">
+        <article id="inventory" class="admin-widget">
+          <header><div><span>Inventory</span><h2>Stock attention</h2></div><a href="#catalogue">Manage stock →</a></header>
+          <div class="attention-list">
+            {% for product in products[:6] %}
+            <div><img src="{{ product.image }}" alt=""><span><b>{{ product.name }}</b><small>{{ product.sku }} · {{ product.category.name }}</small></span><strong class="{{ 'critical' if product.stock<10 else '' }}">{{ product.stock }}</strong></div>
+            {% endfor %}
+          </div>
+        </article>
+        <article class="admin-widget">
+          <header><div><span>Catalogue</span><h2>Top products</h2></div><span>Units</span></header>
+          <div class="leader-list">
+            {% for row in top_products %}<div><span><b>{{ row.name }}</b><small>KSh {{ '{:,.0f}'.format(row.sales or 0) }}</small></span><strong>{{ row.quantity }}</strong></div>
+            {% else %}<div class="admin-empty">Sales leaders will appear after orders are placed.</div>{% endfor %}
+          </div>
+        </article>
+      </section>
+
+      <section id="orders" class="admin-widget admin-wide">
+        <header><div><span>Fulfilment</span><h2>Recent orders</h2></div><button class="admin-secondary">Export CSV</button></header>
+        <div class="admin-table-wrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Payment</th><th>Total</th><th>Status</th><th>Date</th></tr></thead><tbody>
+          {% for order in orders[:12] %}<tr><td><b>{{ order.reference }}</b></td><td>{{ order.customer_name }}<small>{{ order.phone }}</small></td><td>{{ order.payment_method|upper }}</td><td><b>KSh {{ '{:,.0f}'.format(order.total) }}</b></td><td><form method="post" action="/admin/orders/{{ order.id }}/status"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select class="order-status status-{{ order.status|lower }}" name="status" onchange="this.form.submit()">{% for status in ['Pending','Processing','Ready','Dispatched','Completed','Cancelled'] %}<option {% if status==order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></form></td><td>{{ order.created_at.strftime('%d %b, %H:%M') }}</td></tr>
+          {% else %}<tr><td colspan="6" class="admin-empty">No orders yet.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </section>
+
+      <section id="catalogue" class="admin-widget admin-wide">
+        <header><div><span>Catalogue</span><h2>Products & inventory</h2></div><button class="admin-primary" type="button" data-admin-open>Add product</button></header>
+        <div class="admin-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Regular</th><th>Selling price</th><th>Stock</th><th></th></tr></thead><tbody>
+          {% for product in products %}<tr><td class="admin-product-cell"><img src="{{ product.image }}" alt=""><span><b>{{ product.name }}</b><small>{{ product.sku }} · {{ product.brand }}</small></span></td><td>{{ product.category.name }}</td><td>KSh {{ '{:,.0f}'.format(product.price) }}</td><td><b>KSh {{ '{:,.0f}'.format(product.effective_price) }}</b></td><td><span class="stock-badge {{ 'critical' if product.stock<10 else '' }}">{{ product.stock }}</span></td><td><button type="button" class="admin-edit admin-row-action" data-product='{{ {"id":product.id,"name":product.name,"slug":product.slug,"sku":product.sku,"brand":product.brand,"category_id":product.category_id,"price":product.price|float,"sale_price":product.sale_price|float if product.sale_price else "","stock":product.stock,"image":product.image,"description":product.description,"benefits":product.benefits,"usage":product.usage,"ingredients":product.ingredients,"warnings":product.warnings,"featured":product.featured}|tojson }}'>Edit</button></td></tr>
+          {% endfor %}
+        </tbody></table></div>
+      </section>
+
+      <section id="variations" class="admin-dashboard-grid">
+        <article class="admin-widget"><header><div><span>Variations</span><h2>Product families</h2></div></header><div class="admin-option-list"><div><b>Jamieson Melatonin</b><span>3mg · 10mg</span></div><div><b>Jamieson Vitamin D3</b><span>1000 IU · 2500 IU</span></div><div><b>Calcium Magnesium</b><span>D3 · Zinc</span></div></div></article>
+        <article id="categories" class="admin-widget"><header><div><span>Taxonomy</span><h2>Categories</h2></div></header><form class="admin-inline-form" method="post" action="/admin/categories"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="name" placeholder="Category name" required><input name="icon" placeholder="Icon" maxlength="4"><input name="description" placeholder="Description"><button class="admin-primary">Add</button></form><div class="category-tags">{% for category in categories %}<span>{{ category.icon }} {{ category.name }} <b>{{ category.products|length }}</b></span>{% endfor %}</div></article>
+      </section>
+
+      <section id="stock-purchasing" class="admin-dashboard-grid erp-grid">
+        <article id="batches" class="admin-widget"><header><div><span>ERPNext pattern</span><h2>Batches & expiry</h2></div><button class="admin-secondary">Add batch</button></header><div class="admin-option-list"><div><b>Batch traceability</b><span>Assign batch numbers to medicines</span></div><div><b>Expiry control</b><span>FEFO picking and expiry alerts</span></div><div><b>Negative stock</b><span class="success-text">Blocked for batch items</span></div><div><b>Recall readiness</b><span>Trace affected stock and orders</span></div></div></article>
+        <article id="purchasing" class="admin-widget"><header><div><span>Procurement</span><h2>Purchase cycle</h2></div><button class="admin-primary">New purchase order</button></header><div class="erp-flow"><span>Material request</span><i>→</i><span>Purchase order</span><i>→</i><span>Goods receipt</span><i>→</i><span>Supplier invoice</span></div><div class="admin-empty">No open purchase orders.</div></article>
+      </section>
+
+      <section id="supplier-warehouse" class="admin-dashboard-grid erp-grid">
+        <article id="suppliers" class="admin-widget"><header><div><span>Buying</span><h2>Suppliers</h2></div><button class="admin-secondary">Add supplier</button></header><div class="admin-option-list"><div><b>Approved pharmaceutical suppliers</b><span>0 configured</span></div><div><b>Supplier item codes</b><span>Map vendor codes to Shield SKUs</span></div><div><b>Last purchase rate</b><span>Use previous buying price</span></div></div></article>
+        <article id="warehouses" class="admin-widget"><header><div><span>Stock locations</span><h2>Warehouses</h2></div><button class="admin-secondary">Add warehouse</button></header><div class="admin-option-list"><div><b>Main Pharmacy — Nairobi</b><span>{{ products|sum(attribute='stock') }} units</span></div><div><b>Transit stock</b><span>0 units</span></div><div><b>Rejected / quarantine</b><span>0 units</span></div></div></article>
+      </section>
+
+      <section id="reconciliation" class="admin-widget admin-wide"><header><div><span>Stock control</span><h2>Stock reconciliation & ledger</h2></div><div><button class="admin-secondary">Scan barcode</button> <button class="admin-primary">Start reconciliation</button></div></header><div class="reconcile-tools"><a href="#catalogue"><b>Physical count</b><span>Compare book and shelf quantities</span></a><a href="#catalogue"><b>Stock ledger</b><span>Review every stock movement</span></a><a href="#catalogue"><b>Valuation</b><span>FIFO inventory valuation</span></a><a href="#catalogue"><b>Import count</b><span>Upload spreadsheet results</span></a></div></section>
+
+      <section id="care-workspace" class="admin-dashboard-grid">
+        <article id="prescriptions" class="admin-widget"><header><div><span>Clinical queue</span><h2>Prescription reviews</h2></div><span class="admin-live"><i></i> Secure</span></header><div class="admin-empty-state"><b>Rx</b><h3>No prescriptions awaiting review</h3><p>Uploaded prescriptions will appear here for pharmacist validation before fulfilment.</p></div></article>
+        <article id="messages" class="admin-widget"><header><div><span>Care desk</span><h2>Customer messages</h2></div></header>{% for message in messages[:5] %}<div class="message-row"><div><b>{{ message.subject }}</b><span>{{ message.name }} · {{ message.email }}</span><p>{{ message.message }}</p></div>{% if message.status!='Resolved' %}<form method="post" action="/admin/messages/{{ message.id }}/resolve"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="admin-row-action">Resolve</button></form>{% else %}<span class="stock-badge">Resolved</span>{% endif %}</div>{% else %}<div class="admin-empty">No messages.</div>{% endfor %}</article>
+      </section>
+
+      <section id="customers" class="admin-widget admin-wide"><header><div><span>CRM</span><h2>Customers</h2></div><span>{{ users|length }} accounts</span></header><div class="admin-table-wrap"><table><thead><tr><th>Customer</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead><tbody>{% for user in users %}<tr><td><b>{{ user.name }}</b></td><td>{{ user.email }}</td><td>{{ user.phone or '—' }}</td><td><span class="stock-badge">{{ user.role }}</span></td><td>{{ user.created_at.strftime('%d %b %Y') }}</td></tr>{% endfor %}</tbody></table></div></section>
+
+      <section id="payment-workspace" class="admin-dashboard-grid">
+        <article id="payments" class="admin-widget"><header><div><span>Transactions</span><h2>M-Pesa & payments</h2></div></header>{% for payment in payments %}<div class="payment-row"><span><b>{{ payment.provider|upper }}</b><small>{{ payment.created_at.strftime('%d %b, %H:%M') }}</small></span><strong class="payment-{{ payment.status|lower }}">{{ payment.status }}</strong></div>{% else %}<div class="admin-empty">No payment attempts recorded.</div>{% endfor %}</article>
+        <article id="coupons" class="admin-widget"><header><div><span>Promotions</span><h2>Coupons</h2></div></header>{% for coupon in coupons %}<div class="coupon-row"><b>{{ coupon.code }}</b><span>{{ coupon.percent_off }}% off</span><strong>{{ 'Active' if coupon.active else 'Paused' }}</strong></div>{% endfor %}</article>
+      </section>
+
+      <section id="settings-workspace" class="admin-dashboard-grid">
+        <article id="delivery" class="admin-widget"><header><div><span>Last mile</span><h2>Delivery settings</h2></div></header><div class="admin-option-list"><div><b>Nairobi same-day</b><span>KSh 250 · Free over KSh 3,000</span></div><div><b>Order cut-off</b><span>3:00 PM</span></div><div><b>Coverage</b><span>Nairobi and selected nearby areas</span></div></div></article>
+        <article id="settings" class="admin-widget"><header><div><span>System</span><h2>Pharmacy settings</h2></div></header><div class="admin-option-list"><div><b>Store status</b><span class="success-text">Online</span></div><div><b>Pharmacist support</b><span>Mon–Sat, 8:00–20:00</span></div><div><b>Currency</b><span>KES (KSh)</span></div><div><b>Low-stock threshold</b><span>10 units</span></div></div></article>
+      </section>
+
+      <section id="crm-workspace" class="admin-page-grid">
+        <article class="admin-widget"><header><div><span>CRM pipeline</span><h2>Leads & opportunities</h2></div><span>{{ leads|length }} active records</span></header><div class="crm-pipeline"><div><span>New leads</span><b>{{ leads|selectattr('stage','equalto','New')|list|length }}</b><small>Website and pharmacist enquiries</small></div><div><span>Qualified</span><b>{{ leads|selectattr('stage','equalto','Qualified')|list|length }}</b><small>Ready for follow-up</small></div><div><span>Opportunity</span><b>{{ leads|selectattr('stage','equalto','Opportunity')|list|length }}</b><small>KSh {{ '{:,.0f}'.format(leads|selectattr('stage','equalto','Opportunity')|sum(attribute='opportunity_value')) }}</small></div><div><span>Converted</span><b>{{ leads|selectattr('stage','equalto','Converted')|list|length }}</b><small>Won relationships</small></div></div></article>
+        <article class="admin-widget crm-create"><header><div><span>New relationship</span><h2>Add lead</h2></div></header><form method="post" action="/admin/crm/leads" class="admin-inline-form crm-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Name<input name="name" required></label><label>Company<input name="company"></label><label>Email<input type="email" name="email" required></label><label>Phone<input name="phone"></label><label>Source<select name="source"><option>Website</option><option>Walk-in</option><option>Referral</option><option>WhatsApp</option><option>Corporate outreach</option></select></label><label>Owner<input name="owner" value="{{ current_user.name }}"></label><label>Opportunity value<input name="opportunity_value" type="number" min="0" value="0"></label><label>Next follow-up<input name="next_follow_up" type="date"></label><label class="span-2">Notes<textarea name="notes" rows="2"></textarea></label><button class="admin-primary span-2">Save lead</button></form></article>
+        <article class="admin-widget"><header><div><span>Customer intelligence</span><h2>Segments</h2></div><button class="admin-secondary">New segment</button></header><div class="reconcile-tools"><a><b>New customers</b><span>Joined in the last 30 days</span></a><a><b>Repeat buyers</b><span>More than one completed order</span></a><a><b>High value</b><span>Lifetime value above KSh 10,000</span></a><a><b>Needs follow-up</b><span>Unresolved care conversation</span></a></div></article>
+        <article class="admin-widget crm-records"><header><div><span>Pipeline records</span><h2>Lead workspace</h2></div></header><div class="admin-table-wrap"><table><thead><tr><th>Lead</th><th>Stage</th><th>Owner</th><th>Value</th><th>Follow-up</th><th>Log activity</th></tr></thead><tbody>{% for lead in leads %}<tr><td><b>{{ lead.name }}</b><small>{{ lead.company or lead.email }} · {{ lead.source }}</small></td><td><form method="post" action="/admin/crm/leads/{{ lead.id }}/stage"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="stage" onchange="this.form.submit()">{% for stage in ['New','Qualified','Opportunity','Converted','Lost'] %}<option {{ 'selected' if lead.stage==stage }}>{{ stage }}</option>{% endfor %}</select></form></td><td>{{ lead.owner }}</td><td>KSh {{ '{:,.0f}'.format(lead.opportunity_value) }}</td><td>{{ lead.next_follow_up.strftime('%d %b %Y') if lead.next_follow_up else 'Not set' }}</td><td><form method="post" action="/admin/crm/leads/{{ lead.id }}/activities" class="crm-note"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select name="activity_type"><option>Note</option><option>Call</option><option>Email</option><option>Meeting</option><option>WhatsApp</option></select><input name="details" placeholder="Add interaction…" required><button class="admin-secondary">Add</button></form></td></tr>{% else %}<tr><td colspan="6" class="admin-empty">No leads yet. Add the first relationship above.</td></tr>{% endfor %}</tbody></table></div></article>
+        <article class="admin-widget crm-records"><header><div><span>Execution queue</span><h2>CRM tasks</h2></div><span>{{ crm_tasks|rejectattr('status','equalto','Completed')|list|length }} open</span></header><div class="admin-table-wrap"><table><thead><tr><th>Task</th><th>Lead</th><th>Assigned</th><th>Priority</th><th>Due</th><th></th></tr></thead><tbody>{% for task in crm_tasks %}<tr><td><b>{{ task.title }}</b></td><td>{{ task.lead.name }}</td><td>{{ task.assigned_to }}</td><td><span class="stock-badge {{ 'critical' if task.priority=='Urgent' }}">{{ task.priority }}</span></td><td>{{ task.due_at.strftime('%d %b %Y') if task.due_at else 'Unscheduled' }}</td><td>{% if task.status!='Completed' %}<form method="post" action="/admin/crm/tasks/{{ task.id }}/complete"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="admin-secondary">Complete</button></form>{% else %}<span class="stock-badge">Completed</span>{% endif %}</td></tr>{% else %}<tr><td colspan="6" class="admin-empty">No CRM tasks yet.</td></tr>{% endfor %}</tbody></table></div><details class="crm-task-create"><summary>+ Schedule follow-up task</summary><form method="post" action="/admin/crm/tasks" class="admin-inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Lead<select name="lead_id">{% for lead in leads %}<option value="{{ lead.id }}">{{ lead.name }}</option>{% endfor %}</select></label><label>Task<input name="title" required></label><label>Assigned to<input name="assigned_to" value="{{ current_user.name }}"></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Urgent</option></select></label><label>Due date<input name="due_at" type="date"></label><button class="admin-primary">Create task</button></form></details></article>
+        <article class="admin-widget"><header><div><span>Activity</span><h2>CRM timeline</h2></div></header><div class="admin-option-list">{% for activity in crm_activities %}<div><b>{{ activity.lead.name }} · {{ activity.activity_type }}</b><span>{{ activity.details }} — {{ activity.created_by }}, {{ activity.created_at.strftime('%d %b, %H:%M') }}</span></div>{% else %}<div class="admin-empty">CRM activities will appear here.</div>{% endfor %}</div></article>
+      </section>
+
+      <section id="audit-workspace" class="admin-widget admin-wide">
+        <header><div><span>Governance</span><h2>Immutable operations trail</h2></div><span>Latest {{ audit_events|length }} events</span></header>
+        <div class="admin-table-wrap"><table><thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Record</th><th>Summary</th><th>Source IP</th></tr></thead><tbody>{% for event in audit_events %}<tr><td>{{ event.created_at.strftime('%d %b %Y, %H:%M:%S') }}</td><td>{{ event.actor.name if event.actor else 'System' }}</td><td><code>{{ event.action }}</code></td><td>{{ event.entity_type }} #{{ event.entity_id or '—' }}</td><td>{{ event.summary }}</td><td>{{ event.ip_address or '—' }}</td></tr>{% else %}<tr><td colspan="6" class="admin-empty">Audit events will appear as staff perform governed actions.</td></tr>{% endfor %}</tbody></table></div>
+      </section>
+
+      <section id="marketing-workspace" class="admin-page-grid">
+        <article class="admin-widget"><header><div><span>Campaigns</span><h2>Marketing campaigns</h2></div><button class="admin-primary">Create campaign</button></header><div class="admin-table-wrap"><table><thead><tr><th>Campaign</th><th>Channel</th><th>Audience</th><th>Status</th></tr></thead><tbody><tr><td><b>Welcome care journey</b></td><td>Email</td><td>New customers</td><td><span class="stock-badge">Ready</span></td></tr><tr><td><b>Refill reminder</b></td><td>SMS / WhatsApp</td><td>Eligible repeat buyers</td><td><span class="stock-badge">Draft</span></td></tr><tr><td><b>Wellness education</b></td><td>Email</td><td>Opted-in customers</td><td><span class="stock-badge">Draft</span></td></tr></tbody></table></div></article>
+        <article class="admin-widget"><header><div><span>Channels</span><h2>Marketing tools</h2></div></header><div class="reconcile-tools"><a><b>Email campaigns</b><span>Consent-based newsletters</span></a><a><b>SMS reminders</b><span>Order and refill communication</span></a><a><b>WhatsApp</b><span>Care-team approved messages</span></a><a><b>Coupons</b><span>{{ coupons|length }} promotion codes</span></a></div></article>
+        <article class="admin-widget"><header><div><span>Retention</span><h2>Customer journeys</h2></div></header><div class="admin-option-list"><div><b>Welcome series</b><span>Account created → care orientation → first-order offer</span></div><div><b>Abandoned basket</b><span>Reminder without disclosing sensitive product details</span></div><div><b>Post-purchase care</b><span>Delivery confirmation → support → review request</span></div><div><b>Replenishment</b><span>Customer-controlled reminders for eligible wellness items</span></div></div></article>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="admin-modal" hidden><button class="admin-modal-backdrop" type="button" data-admin-close aria-label="Close"></button><form class="admin-product-form" method="post" action="/admin/products/save" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="product_id"><div class="section-head"><h2 data-form-title>Add product</h2><button type="button" class="filter-close" data-admin-close>×</button></div><div class="form-grid"><label>Product name<input name="name" required></label><label>Slug<input name="slug" placeholder="generated automatically"></label><label>SKU<input name="sku" required></label><label>Brand<input name="brand" required></label><label>Category<select name="category_id" required>{% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label><label>Regular price<input name="price" type="number" min="0" step="0.01" required></label><label>Sale price<input name="sale_price" type="number" min="0" step="0.01"></label><label>Stock<input name="stock" type="number" min="0" required></label><label class="span-2">Image URL<input name="image" type="url"></label><label class="span-2">Or upload image<input name="image_file" type="file" accept="image/png,image/jpeg,image/webp"></label><label class="span-2">Description<textarea name="description" required></textarea></label><label>Benefits<textarea name="benefits"></textarea></label><label>How to use<textarea name="usage"></textarea></label><label>Ingredients<textarea name="ingredients"></textarea></label><label>Warnings<textarea name="warnings"></textarea></label><label class="check"><input name="featured" type="checkbox"> Featured product</label></div><button class="admin-primary full">Save product</button></form></div>
+{% endblock %}

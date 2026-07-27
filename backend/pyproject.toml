@@ -1,0 +1,25 @@
+[project]
+name = "shield-pharmacy-api"
+version = "0.1.0"
+description = "Shield Pharmacy Flask API"
+requires-python = ">=3.12"
+dependencies = [
+  "Flask>=3.1,<4",
+  "Flask-SQLAlchemy>=3.1,<4",
+  "Flask-Login>=0.6,<1",
+  "Flask-WTF>=1.2,<2",
+  "PyMySQL>=1.1,<2",
+  "python-dotenv>=1.0,<2",
+  "gunicorn>=23,<24",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
